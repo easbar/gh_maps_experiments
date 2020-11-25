@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/css/ol.css">
+  <!-- this can be used to convert maptiler styles into mapbox styles -->
+  <script src="https://cdn.jsdelivr.net/npm/ol-mapbox-style@6.1.4/dist/olms.js"></script>
+  <!-- this is used to render geojson as vector tiles on the client-side, this is a mapbox project and used by mapbox gl js internally-->
+  <script src="https://mapbox.github.io/geojson-vt/geojson-vt-dev.js"></script>
+  <!-- with this version it did not work: 'this._loader is not a function' -->
+  <!-- <script src="https://unpkg.com/geojson-vt@3.2.0/geojson-vt.js"></script> -->
+  <script src="https://unpkg.com/papaparse@latest/papaparse.min.js"></script>
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+
+    #layer-menu {
+      position: absolute;
+      background: rgba(0, 60, 136, 0.7);
+      color: white;
+      padding: 10px;
+    }
+
+    #mvt-menu {
+      position: absolute;
+      left: 200px;
+      background: rgba(0, 60, 136, 0.7);
+      color: white;
+      padding: 10px;
+    }
+
+    #iso-menu {
+      position: absolute;
+      left: 400px;
+      background: rgba(0, 60, 136, 0.7);
+      color: white;
+      padding: 10px;
+    }
+
+    #info {
+      z-index: 1;
+      opacity: 0;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      margin: 0;
+      background: rgba(0, 60, 136, 0.7);
+      color: white;
+      border: 0;
+      transition: opacity 100ms ease-in;
+    }
+  </style>
+</head>
+
+<body>
+  <div id='map'>
+    <pre id="info">
+    </div>
+  <div id='layer-menu'>
+    <input id='vector' type='radio' name='layer-toggle' value='vector' checked='checked'><label
+      for='vector'>vector</label>
+    <input id='raster' type='radio' name='layer-toggle' value='raster'><label for='raster'>raster</label>
+  </div>
+  <div id='mvt-menu'>
+    <input id='show-graph' type='checkbox'><label for='show-graph'>show GH graph</label>
+  </div>
+  <div id='iso-menu'>
+    <input id='isochrone-radius' type='number' value=300><label for='isochrone-radius'> isochrone radius in
+      seconds</label>
+  </div>
+  <script>
+    var mapTilerKey = 'yrAYvi6TTYgg9U5mBtiY';
+
+    /** add vector tiles to menu! tried this but did not work
+    var vectorStyle = 'https://api.maptiler.com/maps/basic/style.json?key=' + mapTilerKey;
+    var vectorLayer = new ol.layer.VectorTile({
+      source: new ol.source.VectorTile({
+        format: new ol.format.MVT(),
+        url: 'https://api.maptiler.com/tiles/v3/11/1098/672.pbf?key=' + mapTilerKey
+      })
+    });
+    fetch(vectorStyle)
+      .then(response => response.json())
+      .then(glStyle => olms.stylefunction(vectorLayer, glStyle, 'vector'));
+      */
+    var rasterLayer = new ol.layer.Tile({
+      source: new ol.source.OSM({ url: 'https://{a-c}.tile.openstreetmap.de/{z}/{x}/{y}.png' }),
+    });
+    var map = new ol.Map({
+      target: 'map',
+      view: new ol.View({
+        center: ol.proj.fromLonLat([13.4110450, 52.5214697]),
+        zoom: 9,
+      }),
+    });
+    // we apply the mapbox style to add the vector layer (this is so weird)
+    var vectorStyle = 'https://api.maptiler.com/maps/basic/style.json?key=' + mapTilerKey;
+    fetch(vectorStyle)
+      .then(response => response.json())
+      .then(styleJson => {
+        olms.apply(map, styleJson);
+        // would love to get the layer we just created, or even better create it explicitly instead of calling this weird apply
+        // function... but somehow olms.getLayer() is not available (maybe we did not include olms properly?) 
+        // and I did not figure out how to create the layer with the style?
+      })
+      .catch(err => console.log(err));
+
+    // add GraphHopper vector tiles of road network
+    var roadStyle = {
+      motorWayStyle: new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'red' }) }),
+      primaryStyle: new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'orange' }) }),
+      trunkStyle: new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'orange' }) }),
+      secondaryStyle: new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'yellow' }) }),
+      defaultStyle: new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'grey' }) })
+    }
+    var ghMvtLayer = new ol.layer.VectorTile({
+      source: new ol.source.VectorTile({
+        format: new ol.format.MVT(),
+        url: 'http://localhost:8989/mvt/{z}/{x}/{y}.mvt?details=road_class'
+      }),
+      style: function (feature, resolution) {
+        // this is something open-layers can do that mapbox cannot: 
+        // we apply an arbitrary javascript function to define the style and we are not stuck with mapbox's expression language
+        // then again so far we do not do anything that is not easy to do with the expression language either...
+        switch (feature.get('road_class')) {
+          case 'motorway': return roadStyle.motorWayStyle;
+          case 'primary': return roadStyle.primaryStyle;
+          case 'trunk': return roadStyle.trunkStyle;
+          case 'secondary': return roadStyle.secondaryStyle;
+          default: return roadStyle.defaultStyle;
+        }
+      }
+    });
+    function toggleMvt(on) {
+      // todo: keeping the layer around gives a much better experience when toggling it, can we do the same for mapbox?
+      if (on) {
+        map.addLayer(ghMvtLayer);
+      } else {
+        map.removeLayer(ghMvtLayer);
+      }
+    }
+    document.querySelector('#show-graph').onclick = e => toggleMvt(e.target.checked);
+
+    // show info about layer features on mouse over
+    // todo: add this for mapbox as well?
+    map.on('pointermove', showInfo);
+    var info = document.getElementById('info');
+    function showInfo(e) {
+      var features = map.getFeaturesAtPixel(e.pixel);
+      if (features.length == 0) {
+        info.innerText = 'Click map to calculate isochrone, or hover feature to see properties';
+        info.style.opacity = 1;
+        return;
+      }
+      var properties = features[0].getProperties();
+      info.innerText = JSON.stringify(properties, null, 2).substring(0, 800);
+      info.style.opacity = 1;
+    }
+
+    var isochroneLayer = {};
+    map.on('click', function (e) {
+      // fetch GraphHopper isochrone and draw on map
+      var point = ol.proj.toLonLat(e.coordinate);
+      var counter = 0;
+      var coordinates = [];
+      var radius = document.getElementById('isochrone-radius').value;
+      Papa.parse("http://localhost:8989/spt?profile=car&point=" + point[1] + "," + point[0] + "&columns=prev_longitude,prev_latitude,longitude,latitude,distance,time&time_limit=" + radius, {
+        download: true,
+        worker: true,
+        step: function (results) {
+          var d = results.data;
+          // skip the first line (column names) and the second (root node)
+          if (counter > 1)
+            coordinates.push([[parseFloat(d[0]), parseFloat(d[1])], [parseFloat(d[2]), parseFloat(d[3])]]);
+          counter++;
+        },
+        complete: function () {
+          map.removeLayer(isochroneLayer);
+          var json = {
+            'type': 'FeatureCollection',
+            'features': [
+              {
+                'type': 'Feature',
+                'geometry': {
+                  'type': 'MultiLineString',
+                  'coordinates': coordinates
+                }
+              }
+            ]
+          };
+          var tileIndex = geojsonvt(json, { extent: 4096, debug: 1 });
+          var format = new ol.format.GeoJSON({
+            // Data returned from geojson-vt is in tile pixel units
+            dataProjection: new ol.proj.Projection({
+              code: 'TILE_PIXELS',
+              units: 'tile-pixels',
+              // todo: can we tune this?!
+              extent: [0, 0, 4096, 4096],
+            }),
+          });
+          var vectorSource = new ol.source.VectorTile({
+            tileUrlFunction: function (tileCoord) {
+              // Use the tile coordinate as a pseudo URL for caching purposes
+              return JSON.stringify(tileCoord);
+            },
+            tileLoadFunction: function (tile, url) {
+              var tileCoord = JSON.parse(url);
+              var data = tileIndex.getTile(tileCoord[0], tileCoord[1], tileCoord[2]);
+              var geojson = JSON.stringify(
+                {
+                  type: 'FeatureCollection',
+                  features: data ? data.features : [],
+                },
+                geojsonVT2geoJSON
+              );
+              var features = format.readFeatures(geojson, {
+                extent: vectorSource.getTileGrid().getTileCoordExtent(tileCoord),
+                featureProjection: map.getView().getProjection(),
+              });
+              tile.setFeatures(features);
+            },
+          });
+          var style = new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'green', width: 1 }) });
+          isochroneLayer = new ol.layer.VectorTile({
+            source: vectorSource,
+            style: feature => style
+          });
+          map.addLayer(isochroneLayer);
+        },
+        error: function (e) {
+          console.log('error when trying to show isochrone', e);
+        }
+      },
+      );
+    });
+
+    // todo: this optimization might be useful: https://openlayers.org/en/latest/examples/mapbox-vector-tiles-advanced.html
+
+    // setup layer menu
+    var layerInputs = document.querySelectorAll('#layer-menu input');
+    var vectorLayer = undefined;
+    function changeLayer(layerId) {
+      toggleMvt(false);
+      document.querySelector('#show-graph').checked = false;
+      if (layerId == 'vector') {
+        if (!vectorStyle)
+          return;
+        map.setLayerGroup(new ol.layer.Group());
+        map.addLayer(vectorLayer);
+      } else if (layerId == 'raster') {
+        // this is so ugly... we could neither explicitly create nor get a hold of the vector layer 
+        // right after we created it, so now we are going to remove it we finally store a reference to it
+        // so we can use it once we toggle back to it (see comments further above)
+        vectorLayer = map.getLayers().getArray()[0];
+        map.setLayerGroup(new ol.layer.Group());
+        map.addLayer(rasterLayer);
+      }
+    }
+    for (var i = 0; i < layerInputs.length; i++) {
+      layerInputs[i].onclick = e => changeLayer(e.target.id);
+    }
+
+    // Converts geojson-vt data to GeoJSON
+    function geojsonVT2geoJSON(key, value) {
+      if (value !== null && value.geometry) {
+        var type;
+        var rawType = value.type;
+        var geometry = value.geometry;
+
+        if (rawType === 1) {
+          type = 'MultiPoint';
+          if (geometry.length == 1) {
+            type = 'Point';
+            geometry = geometry[0];
+          }
+        } else if (rawType === 2) {
+          type = 'MultiLineString';
+          if (geometry.length == 1) {
+            type = 'LineString';
+            geometry = geometry[0];
+          }
+        } else if (rawType === 3) {
+          type = 'Polygon';
+          if (geometry.length > 1) {
+            type = 'MultiPolygon';
+            geometry = [geometry];
+          }
+        }
+
+        return {
+          'type': 'Feature',
+          'geometry': {
+            'type': type,
+            'coordinates': geometry,
+          },
+          'properties': value.tags,
+        };
+      } else {
+        return value;
+      }
+    };
+  </script>
+</body>
+
+</html>
