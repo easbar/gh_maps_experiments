@@ -7,6 +7,7 @@
   <script src='https://api.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.js'></script>
   <link href='https://api.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.css' rel='stylesheet' />
   <script src="https://unpkg.com/papaparse@latest/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
   <style>
     #map {
       position: absolute;
@@ -47,23 +48,48 @@
 
 <body>
   <div id='map'></div>
-  <div id='layer-menu'>
-    <input id='vector' type='radio' name='layer-toggle' value='vector' checked='checked'><label
-      for='vector'>vector</label>
-    <input id='raster' type='radio' name='layer-toggle' value='raster'><label for='raster'>raster</label>
-  </div>
-  <div id='mvt-menu'>
-    <input id='show-graph' type='checkbox'><label for='show-graph'>show GH graph</label>
-  </div>
-  <div id='iso-menu'>
-    <input id='isochrone-radius' type='number' value=600><label for='isochrone-radius'> isochrone radius in
-      seconds</label>
-    <input id='use-deck' type='checkbox'><label for='use-deck'>use deck</label>
+  <div id='menu'>
+    <div id='layer-menu'>
+      <input id='vector' type='radio' name='layer-toggle' value='vector' v-model='layer' v-on:click='changeLayer'><label
+        for='vector'>vector</label>
+      <input id='raster' type='radio' name='layer-toggle' value='raster' v-model='layer' v-on:click='changeLayer'><label
+        for='raster'>raster</label>
+    </div>
+    <div id='mvt-menu'>
+      <input id='show-graph' type='checkbox' v-model='showGraph' v-on:click='toggleGHMvt'><label for='show-graph'>show
+        GH
+        graph</label>
+    </div>
+    <div id='iso-menu'>
+      <input id='isochrone-radius' type='number' v-model='isochroneRadius'><label for='isochrone-radius'> isochrone
+        radius in
+        seconds</label>
+      <input id='use-deck' type='checkbox' v-model='useDeck'><label for='use-deck'>use deck</label>
+    </div>
   </div>
   <div id='hint'>
     <p>Click map to calculate isochrone</p>
   </div>
   <script>
+    var menu = new Vue({
+      el: '#menu',
+      data: {
+        layer: 'vector',
+        showGraph: false,
+        isochroneRadius: 600,
+        useDeck: false
+      },
+      methods: {
+        changeLayer: function (event) {
+          this.showGraph = false;
+          setGHMvtVisible(map, false);
+          setLayer(map, event.target.id);
+        },
+        toggleGHMvt: function (event) {
+          setGHMvtVisible(map, event.target.checked);
+        }
+      }
+    });
     var mapTilerKey = 'yrAYvi6TTYgg9U5mBtiY';
     var rasterStyle = {
       'version': 8,
@@ -125,7 +151,7 @@
       // fetch GraphHopper isochrone and draw on map
       var counter = 0;
       var coordinates = [];
-      var radius = document.getElementById('isochrone-radius').value;
+      var radius = menu.isochroneRadius;
       Papa.parse("http://localhost:8989/spt?profile=car&point=" + e.lngLat.lat + ", " + e.lngLat.lng + "&columns=prev_longitude,prev_latitude,longitude,latitude,distance,time&time_limit=" + radius, {
         download: true,
         worker: true,
@@ -155,8 +181,7 @@
               }
             ]
           };
-          var useDeck = document.getElementById('use-deck').checked;
-          if (useDeck) {
+          if (menu.useDeck) {
             var deckLayer = new deck.MapboxLayer({
               'id': 'isochrone-deck-layer',
               'type': deck.LineLayer,
@@ -192,30 +217,21 @@
       });
     });
 
-    // setup layer menu
-    var layerInputs = document.querySelectorAll('#layer-menu input');
-    function changeLayer(layerId) {
-      toggleMvt(false);
-      document.querySelector('#show-graph').checked = false;
+    function setLayer(map, layerId) {
       if (layerId == 'vector') {
         map.setStyle(vectorStyle);
       } else if (layerId == 'raster') {
         map.setStyle(rasterStyle);
       }
     }
-    for (var i = 0; i < layerInputs.length; i++) {
-      layerInputs[i].onclick = e => changeLayer(e.target.id);
-    }
 
-    // setup mvt menu
-    function toggleMvt(on) {
-      if (on) {
-        map.setLayoutProperty('gh', 'visibility', 'visible')
+    function setGHMvtVisible(map, visible) {
+      if (visible) {
+        map.setLayoutProperty('gh', 'visibility', 'visible');
       } else {
-        map.setLayoutProperty('gh', 'visibility', 'none')
+        map.setLayoutProperty('gh', 'visibility', 'none');
       }
     }
-    document.querySelector('#show-graph').onclick = e => toggleMvt(e.target.checked);
 
     function getFirstSymbolLayer(map) {
       var layers = map.getStyle().layers;
