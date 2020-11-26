@@ -118,7 +118,8 @@
         'layout': {
           'visibility': 'none'
         }
-      });
+        // we make sure the map labels stay on top
+      }, getFirstSymbolLayer(map));
     });
     map.on('click', function (e) {
       // fetch GraphHopper isochrone and draw on map
@@ -164,7 +165,7 @@
               getTargetPosition: d => d[1],
               getColor: d => [0, 0, 200]
             });
-            map.addLayer(deckLayer);
+            map.addLayer(deckLayer, getFirstSymbolLayer(map));
           } else {
             var source = map.getSource('isochrone');
             if (!source) {
@@ -182,7 +183,7 @@
               'paint': {
                 'line-color': 'red'
               }
-            });
+            }, getFirstSymbolLayer(map));
           }
         },
         error: function (e) {
@@ -215,6 +216,16 @@
       }
     }
     document.querySelector('#show-graph').onclick = e => toggleMvt(e.target.checked);
+
+    function getFirstSymbolLayer(map) {
+      var layers = map.getStyle().layers;
+      // Find the index of the first symbol layer in the map style
+      for (var i = 0; i < layers.length; i++) {
+        if (layers[i].type === 'symbol') {
+          return layers[i].id;
+        }
+      }
+    }
   </script>
 </body>
 
