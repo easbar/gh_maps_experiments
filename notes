@@ -1,0 +1,75 @@
+### OpenLayers vs Mapbox GL JS - vector tile performance
+
+- Since version 6 OpenLayers does not provide a WebGL tile renderer anymore. WebGL support is 
+limited to rendering points currently [1,4].
+  
+- OpenLayers is more flexible with regards to styling vector tiles as it can run arbitrary
+javascript functions to determine the style, while Mapbox uses a rule-based expression language for 
+this [2,3,7]
+  
+- Partly due to this flexibility OpenLayers does not perform as well  on vector tile [5,6,11]
+
+- In the future there might be better performing vector tile rendering solution for OpenLayers based
+on OffscreenCanvas. There is already a working example, but browser support is limited [c]
+  
+- There is no schedule for adding back WebGL support in OpenLayers [9]
+
+- OpenLayers supported WebGL up to version 5, but it was hard to maintain and had problems and thus
+was removed [8],[e,f]
+
+- Since OpenLayers 6 there is support for 'composite' rendering where some layers are rendered 
+the 2d graphics context and others using webGL. There is even an example where they include Mapbox 
+as layer in OpenLayers, but it uses an undocumented Mapbox API [g]
+
+---
+
+[1] "OpenLayers has a growing set of utilities for rendering with WebGL. WebGL rendering is
+currently limited to points, and that is what we'll do in this exercise." [a]
+
+[2] "Vector data can be styled on the client with JavaScript functions. This means that not only
+attributes that are included in the data and the current view resolution can be used for rule-based 
+styling, but any information from the application state." [b]
+
+[3] "The primary renderer in OpenLayers uses <canvas> elements with 2d context as rendering API. It
+provides a maximum of flexibility for vector rendering, with on-the-fly style modifications based 
+on JavaScript functions that have access to the whole application state." [b]
+
+[4] "WebGL contexts are used for special point rendering use cases, like heat maps. With custom
+layer renderers, users can render any content to any DOM element, and the map renderer will take 
+care of the final composition." [b]
+
+[5] "OpenLayers generally performs well with raster data. For vector data, with average style
+complexity, the user experience will be fine with up to 5000 point geometries or line or polygon 
+vertices in the visible map extent. Especially with street map vector tiles, these numbers can be 
+exceeded in some regions at certain zoom levels." [b]
+
+[6] "The flexibility of OpenLayers poses limits on classic performance optimisations, where better
+performance is achieved by doing less work." [b]
+
+[7] "Mapbox GL JS is a mapping library that is optimized for rendering tiles. Vector styles are
+defined as JSON objects and support rules that are evaluated against the map’s zoom level and the 
+data in the tiles. With these constraints, data can be pre-processed for rendering with little CPU 
+effort. After uploading to the GPU, the hard rendering work can be done there, keeping the CPU free 
+for responding to user interactions, loading and parsing. The same technique is used in OpenLayers 
+for the special purpose WebGL points renderer. However, it does not integrate well with the dynamic 
+styling and arbitrary JavaScript execution hooks used for vector layers." [b]
+
+[8] "It worked, but it had bugs and glitches, texts were blurry, and the code was very complex
+because of this. You basically had in the same project two libraries: One for WebGL and one for 2d 
+graphics and it was a lot of code, hard to maintain. So why not render most of the map using 2d 
+graphics and for specific use-cases use WebGL (this is possible since WebGL, because it allows using 
+different renderers for different layers which did not work before)", [d, starting at 10:35]
+
+[9] "there's no plans or funding for now": https://github.com/openlayers/openlayers/issues/11137#issuecomment-638657523
+
+[10] "Using VectorTileLayer was giving us some performance issues *especially* on mobile devices" [d, starting at 15:10]
+
+[a] https://openlayers.org/workshop/en/webgl/points.html
+[b] https://www.w3.org/community/maps4html/2020/04/07/better-web-maps-with-new-browser-features/
+[c] https://openlayers.org/en/latest/examples/offscreen-canvas.html
+[d] https://media.ccc.de/v/bucharest-337-openlayers-6-there-and-back-again
+[e] https://github.com/openlayers/openlayers/blob/master/changelog/upgrade-notes.md#drop-of-support-for-the-experimental-webgl-renderer
+[f] https://github.com/openlayers/openlayers/issues/8991#issuecomment-440281693
+[g] https://openlayers.org/en/master/examples/mapbox-layer.html
+
+ 
