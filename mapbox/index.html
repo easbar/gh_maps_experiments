@@ -29,7 +29,7 @@
     </div>
     <div id='iso-menu'>
       <input id='isochrone-point' type='text' v-model='isochronePoint' @keyup.enter='updateIsochrone'>
-      <input id='isochrone-radius' type='number' v-model='isochroneRadius'>
+      <input id='isochrone-radius' type='number' v-model='isochroneRadius' @change='updateIsochrone'>
       <label for='isochrone-radius'> iso radius (s)</label>
       <input id='use-deck' type='checkbox' v-model='useDeck' @change='updateIsochrone'>
       <label for='use-deck'>use deck</label>
