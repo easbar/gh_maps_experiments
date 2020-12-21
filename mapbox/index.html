@@ -28,14 +28,13 @@
       <label for='show-graph'> show GH graph</label>
     </div>
     <div id='iso-menu'>
+      <input id='isochrone-point' type='text' v-model='isochronePoint' @keyup.enter='updateIsochrone'>
       <input id='isochrone-radius' type='number' v-model='isochroneRadius'>
       <label for='isochrone-radius'> iso radius (s)</label>
       <input id='use-deck' type='checkbox' v-model='useDeck' @change='updateIsochrone'>
       <label for='use-deck'>use deck</label>
       <input id='show-spt' type='checkbox' v-model='showSpt' @change='updateIsochrone'>
       <label for='show-spt'>show SPT</label>
-      <input id='isochrone-point' type='text' v-model='isochronePoint' @keyup.enter='updateIsochrone'>
-      <label for='isochrone-point'>iso point</label>
     </div>
   </div>
   <div id='hint'>
