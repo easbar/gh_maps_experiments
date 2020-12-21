@@ -5,7 +5,8 @@ var menu = new Vue({
         showGraph: false,
         isochroneRadius: 600,
         useDeck: false,
-        showSpt: false
+        showSpt: false,
+        isochronePoint: undefined
     },
     methods: {
         changeLayer: function (event) {
@@ -16,6 +17,18 @@ var menu = new Vue({
         },
         toggleGHMvt: function (event) {
             setGHMvtVisible(map, event.target.checked);
+        },
+        updateIsochrone: function (event) {
+            if (!this.isochronePoint)
+                return;
+            var coordinates = this.isochronePoint.split(',')
+                .map(item => item.trim())
+                .map(parseFloat);
+            if (coordinates.length != 2) {
+                console.error('invalid point: ' + this.isochronePoint);
+            } else {
+                _updateIsochrone({ lng: coordinates[1], lat: coordinates[0] });
+            }
         }
     }
 });
@@ -77,11 +90,16 @@ map.on('style.load', function addGHMvt() {
     }, getFirstSymbolLayer(map));
 });
 map.on('click', function (e) {
-    if (menu.showSpt)
-        fetchAndDrawSPT(e.lngLat);
-    else
-        fetchAndDrawIsoline(e.lngLat);
+    _updateIsochrone(e.lngLat);
 });
+
+function _updateIsochrone(lngLat) {
+    menu.isochronePoint = lngLat.lat.toFixed(6) + "," + lngLat.lng.toFixed(6);
+    if (menu.showSpt)
+        fetchAndDrawSPT(lngLat);
+    else
+        fetchAndDrawIsoline(lngLat);
+}
 
 function fetchAndDrawSPT(point) {
     // fetch GraphHopper isochrone and draw on map
