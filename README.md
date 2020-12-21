@@ -8,8 +8,9 @@
 * Experiments for Mapbox GL JS and OpenLayers
 * Render the map using Raster or Vector Tiles
 * Render GraphHopper graph using /mvt endpoint
-* Click the map to render the shortest path tree for a given time-radius
-* Use deck.gl to render the shortest path tree (this only works with Mapbox so far)
+* Render the shortest path tree for a given time-radius
+* Mapbox only: Render isochrones for a given time-radius
+* Mapbox only: Use deck.gl to render the shortest path tree or ischrone
 
 # References
 
