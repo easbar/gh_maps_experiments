@@ -11,6 +11,7 @@ var menu = new Vue({
         changeLayer: function (event) {
             this.showGraph = false;
             setGHMvtVisible(map, false);
+            removeIsoLayers();
             setLayer(map, event.target.id);
         },
         toggleGHMvt: function (event) {
@@ -133,12 +134,7 @@ function fetchAndDrawIsoline(point) {
 }
 
 function drawIsoLayer(geojson, coordinates) {
-    if (map.getLayer('isochrone-layer')) {
-        map.removeLayer('isochrone-layer');
-    }
-    if (map.getLayer('isochrone-deck-layer')) {
-        map.removeLayer('isochrone-deck-layer');
-    }
+    removeIsoLayers();
     if (menu.useDeck) {
         var deckLayer = new deck.MapboxLayer({
             id: 'isochrone-deck-layer',
@@ -170,6 +166,15 @@ function drawIsoLayer(geojson, coordinates) {
                 'line-color': '#0000e1'
             }
         }, getFirstSymbolLayer(map));
+    }
+}
+
+function removeIsoLayers() {
+    if (map.getLayer('isochrone-layer')) {
+        map.removeLayer('isochrone-layer');
+    }
+    if (map.getLayer('isochrone-deck-layer')) {
+        map.removeLayer('isochrone-deck-layer');
     }
 }
 
