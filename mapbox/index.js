@@ -4,7 +4,8 @@ var menu = new Vue({
         layer: 'vector',
         showGraph: false,
         isochroneRadius: 600,
-        useDeck: false
+        useDeck: false,
+        showSpt: false
     },
     methods: {
         changeLayer: function (event) {
@@ -75,11 +76,18 @@ map.on('style.load', function addGHMvt() {
     }, getFirstSymbolLayer(map));
 });
 map.on('click', function (e) {
+    if (menu.showSpt)
+        fetchAndDrawSPT(e.lngLat);
+    else
+        fetchAndDrawIsoline(e.lngLat);
+});
+
+function fetchAndDrawSPT(point) {
     // fetch GraphHopper isochrone and draw on map
     var counter = 0;
     var coordinates = [];
     var radius = menu.isochroneRadius;
-    Papa.parse("http://localhost:8989/spt?profile=car&point=" + e.lngLat.lat + ", " + e.lngLat.lng + "&columns=prev_longitude,prev_latitude,longitude,latitude,distance,time&time_limit=" + radius, {
+    Papa.parse("http://localhost:8989/spt?profile=car&point=" + point.lat + "," + point.lng + "&columns=prev_longitude,prev_latitude,longitude,latitude,distance,time&time_limit=" + radius, {
         download: true,
         worker: true,
         step: function (results) {
@@ -90,12 +98,6 @@ map.on('click', function (e) {
             counter++;
         },
         complete: function () {
-            if (map.getLayer('isochrone-layer')) {
-                map.removeLayer('isochrone-layer');
-            }
-            if (map.getLayer('isochrone-deck-layer')) {
-                map.removeLayer('isochrone-deck-layer');
-            }
             var geojson = {
                 'type': 'FeatureCollection',
                 'features': [
@@ -108,41 +110,68 @@ map.on('click', function (e) {
                     }
                 ]
             };
-            if (menu.useDeck) {
-                var deckLayer = new deck.MapboxLayer({
-                    'id': 'isochrone-deck-layer',
-                    'type': deck.LineLayer,
-                    'data': coordinates,
-                    getSourcePosition: d => d[0],
-                    getTargetPosition: d => d[1],
-                    getColor: d => [0, 0, 200]
-                });
-                map.addLayer(deckLayer, getFirstSymbolLayer(map));
-            } else {
-                var source = map.getSource('isochrone');
-                if (!source) {
-                    map.addSource('isochrone', {
-                        'type': 'geojson',
-                        'data': geojson
-                    });
-                } else {
-                    source.setData(geojson);
-                }
-                map.addLayer({
-                    'id': 'isochrone-layer',
-                    'type': 'line',
-                    'source': 'isochrone',
-                    'paint': {
-                        'line-color': 'red'
-                    }
-                }, getFirstSymbolLayer(map));
-            }
+            drawIsoLayer(geojson, coordinates);
         },
         error: function (e) {
-            console.log('error when trying to show isochrone', e);
+            console.error('error when trying to show SPT', e);
         }
     });
-});
+}
+
+function fetchAndDrawIsoline(point) {
+    var radius = menu.isochroneRadius;
+    fetch("http://localhost:8989/isochrone?profile=car&point=" + point.lat + "," + point.lng + "&time_limit=" + radius)
+        .then(response => response.json())
+        .then(data => {
+            console.log('isoline took: ' + data.info.took + 'ms');
+            // since we do not use the buckets parameter there is always just one polygon
+            drawIsoLayer(data.polygons[0], undefined)
+        })
+        .catch(e => {
+            console.error('error when trying to show isoline', e)
+        });
+}
+
+function drawIsoLayer(geojson, coordinates) {
+    if (map.getLayer('isochrone-layer')) {
+        map.removeLayer('isochrone-layer');
+    }
+    if (map.getLayer('isochrone-deck-layer')) {
+        map.removeLayer('isochrone-deck-layer');
+    }
+    if (menu.useDeck) {
+        var deckLayer = new deck.MapboxLayer({
+            id: 'isochrone-deck-layer',
+            // for some reason the deck.GeoJsonLayer does not work with our MultiLineString geojson we use for SPT => use LineLayer instead
+            type: coordinates ? deck.LineLayer : deck.GeoJsonLayer,
+            data: coordinates ? coordinates : geojson,
+            getSourcePosition: coordinates ? d => d[0] : undefined,
+            getTargetPosition: coordinates ? d => d[1] : undefined,
+            getFillColor: [0, 0, 225, 100],
+            getLineColor: [0, 0, 225],
+            getColor: d => [0, 0, 225]
+        });
+        map.addLayer(deckLayer, getFirstSymbolLayer(map));
+    } else {
+        var source = map.getSource('isochrone');
+        if (!source) {
+            map.addSource('isochrone', {
+                'type': 'geojson',
+                'data': geojson
+            });
+        } else {
+            source.setData(geojson);
+        }
+        map.addLayer({
+            'id': 'isochrone-layer',
+            'type': 'line',
+            'source': 'isochrone',
+            'paint': {
+                'line-color': '#0000e1'
+            }
+        }, getFirstSymbolLayer(map));
+    }
+}
 
 function setLayer(map, layerId) {
     if (layerId == 'vector') {
